@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+//* eslint-disable react/prop-types */
 import React, { useEffect, useState } from 'react'
 import { StyleSheet, View, FlatList, ImageBackground, Image, Pressable } from 'react-native'
 import { showMessage } from 'react-native-flash-message'
@@ -18,9 +18,14 @@ import ImageCard from '../../components/ImageCard'
 
 export default function OrdersScreen ({ navigation, route }) {
   const [restaurant, setRestaurant] = useState({})
+  const [orders, setOrders] = useState([])
 
   useEffect(() => {
     fetchRestaurantDetail()
+  }, [route])
+
+  useEffect(() => {
+    fetchRestaurantOrders()
   }, [route])
 
   const fetchRestaurantAnalytics = async () => {
@@ -28,7 +33,17 @@ export default function OrdersScreen ({ navigation, route }) {
   }
 
   const fetchRestaurantOrders = async () => {
-
+    try {
+      const fetchedOrders = await getRestaurantOrders(route.params.id)
+      setOrders(fetchedOrders)
+    } catch (error) {
+      showMessage({
+        message: `There was an error while retrieving restaurant orders (id ${route.params.id}). ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
   }
 
   const handleNextStatus = async (order) => {
@@ -107,7 +122,36 @@ export default function OrdersScreen ({ navigation, route }) {
   }
 
   const renderOrder = ({ item }) => {
-
+    return (
+          <ImageCard
+            imageUri={getOrderImage(item.status)}
+            title={`Order created at ${item.createdAt}`}
+          >
+            <TextRegular >Status: {item.status}</TextRegular>
+            <TextRegular >Address: {item.address}</TextRegular>
+            <TextSemiBold textStyle={styles.price}>{item.price.toFixed(2)}€</TextSemiBold>
+             <View style={styles.actionButtonsContainer}>
+              <Pressable
+                onPress={() => navigation.navigate('EditOrderScreen', { id: item.id })
+                }
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: pressed
+                      ? GlobalStyles.brandBlueTap
+                      : GlobalStyles.brandBlue
+                  },
+                  styles.actionButton
+                ]}>
+              <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+                <MaterialCommunityIcons name='pencil' color={'white'} size={20}/>
+                <TextRegular textStyle={styles.text}>
+                  Edit
+                </TextRegular>
+              </View>
+            </Pressable>
+            </View>
+          </ImageCard>
+    )
   }
 
   const renderEmptyOrdersList = () => {
@@ -133,7 +177,16 @@ export default function OrdersScreen ({ navigation, route }) {
   }
 
   return (
-      <></>
+      <>
+      <FlatList
+        style={styles.container}
+        data={orders}
+        renderItem={renderOrder}
+        keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmptyOrdersList}
+      />
+      </>
   )
 }
 
