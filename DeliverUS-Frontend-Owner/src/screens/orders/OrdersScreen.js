@@ -5,7 +5,6 @@ import { showMessage } from 'react-native-flash-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getDetail, getRestaurantAnalytics, getRestaurantOrders } from '../../api/RestaurantEndpoints'
 import { nextStatus } from '../../api/OrderEndpoints'
-
 import TextRegular from '../../components/TextRegular'
 import TextSemiBold from '../../components/TextSemibold'
 import * as GlobalStyles from '../../styles/GlobalStyles'
@@ -18,18 +17,31 @@ import ImageCard from '../../components/ImageCard'
 
 export default function OrdersScreen ({ navigation, route }) {
   const [restaurant, setRestaurant] = useState({})
+  const [analytics, setAnalytics] = useState(null)
   const [orders, setOrders] = useState([])
 
   useEffect(() => {
     fetchRestaurantDetail()
-  }, [route])
-
-  useEffect(() => {
     fetchRestaurantOrders()
   }, [route])
 
-  const fetchRestaurantAnalytics = async () => {
+  useEffect(() => {
+    fetchRestaurantAnalytics()
+  }, [orders])
 
+  const fetchRestaurantAnalytics = async () => {
+    try {
+      const fetchedAnalytics = await getRestaurantAnalytics(route.params.id)
+      setAnalytics(fetchedAnalytics)
+      console.log(fetchedAnalytics)
+    } catch (error) {
+      showMessage({
+        message: `There was an error while retrieving restaurant analytics (id ${route.params.id}). ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
   }
 
   const fetchRestaurantOrders = async () => {
@@ -47,7 +59,23 @@ export default function OrdersScreen ({ navigation, route }) {
   }
 
   const handleNextStatus = async (order) => {
-
+    try {
+      await nextStatus(order)
+      showMessage({
+        message: 'Order status updated successfully',
+        type: 'success',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      fetchRestaurantOrders()
+    } catch (error) {
+      showMessage({
+        message: `There was an error while updating the order status. ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
   }
 
   const renderAnalytics = () => {
@@ -59,7 +87,7 @@ export default function OrdersScreen ({ navigation, route }) {
                 Invoiced today
               </TextRegular>
               <TextSemiBold textStyle={styles.text}>
-              TO DO
+                {analytics.invoicedToday.toFixed(2)}€
               </TextSemiBold>
             </View>
             <View style={styles.analyticsCell}>
@@ -67,18 +95,17 @@ export default function OrdersScreen ({ navigation, route }) {
                 #Pending orders
               </TextRegular>
               <TextSemiBold textStyle={styles.text}>
-              TO DO
+                {analytics.numPendingOrders}
               </TextSemiBold>
             </View>
           </View>
-
           <View style={styles.analyticsRow}>
             <View style={styles.analyticsCell}>
                 <TextRegular textStyle={styles.text}>
                   #Delivered today
                 </TextRegular>
                 <TextSemiBold textStyle={styles.text}>
-                TO DO
+                {analytics.numDeliveredTodayOrders}
                 </TextSemiBold>
               </View>
               <View style={styles.analyticsCell}>
@@ -86,7 +113,7 @@ export default function OrdersScreen ({ navigation, route }) {
                   #Yesterday orders
                 </TextRegular>
                 <TextSemiBold textStyle={styles.text}>
-                TO DO
+                  {analytics.numYesterdayOrders}
                 </TextSemiBold>
               </View>
           </View>
@@ -104,6 +131,9 @@ export default function OrdersScreen ({ navigation, route }) {
             <TextRegular textStyle={styles.description}>{restaurant.restaurantCategory ? restaurant.restaurantCategory.name : ''}</TextRegular>
           </View>
         </ImageBackground>
+        {analytics != null && (
+          renderAnalytics()
+        )}
       </View>
     )
   }
@@ -130,7 +160,7 @@ export default function OrdersScreen ({ navigation, route }) {
             <TextRegular >Status: {item.status}</TextRegular>
             <TextRegular >Address: {item.address}</TextRegular>
             <TextSemiBold textStyle={styles.price}>{item.price.toFixed(2)}€</TextSemiBold>
-             <View style={styles.actionButtonsContainer}>
+            <View style={styles.actionButtonsContainer}>
               <Pressable
                 onPress={() => navigation.navigate('EditOrderScreen', { id: item.id })
                 }
@@ -146,6 +176,24 @@ export default function OrdersScreen ({ navigation, route }) {
                 <MaterialCommunityIcons name='pencil' color={'white'} size={20}/>
                 <TextRegular textStyle={styles.text}>
                   Edit
+                </TextRegular>
+              </View>
+            </Pressable>
+            <Pressable
+                onPress={() => handleNextStatus(item)
+                }
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: pressed
+                      ? GlobalStyles.brandGreenTap
+                      : GlobalStyles.brandGreen
+                  },
+                  styles.actionButton
+                ]}>
+              <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+                <MaterialCommunityIcons name='skip-next' color={'white'} size={20}/>
+                <TextRegular textStyle={styles.text}>
+                  Advance
                 </TextRegular>
               </View>
             </Pressable>
@@ -249,8 +297,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   analyticsRow: {
-
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10
   },
+
   analyticsCell: {
     margin: 5,
     color: 'white',
